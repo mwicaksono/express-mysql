@@ -1,3 +1,4 @@
+const e = require('express');
 const express = require('express');
 
 const router = express.Router();
@@ -12,17 +13,36 @@ router.get('/posts', async (req, res) => {
     const query = `SELECT posts.id as postId, title, summary, body, name 
     FROM posts JOIN authors ON authors.id = posts.author_id`;
     const [posts] = await db.query(query);
+
     res.render('posts-list', { posts });
+
 })
 
 router.get('/posts/:id', async (req, res) => {
-    const id = req.params.id;
-
-    const [post] = await db.query(`SELECT posts.id as postId, title, summary, body, name, date 
+    const query = `
+    SELECT posts.id as postId, title, summary, body, name, date, email
     FROM posts JOIN authors ON authors.id = posts.author_id 
-    WHERE posts.id = ${id}`);
-    // res.send(post[0]);
-    res.render('post-detail', { post: post[0] })
+    WHERE posts.id = ?
+`;
+    const [post] = await db.query(query, [req.params.id]);
+    const postData = {
+        ...post[0],
+        date: post[0].date.toGMTString(),
+        readableDate: post[0].date.toLocaleDateString('id-ID', {
+            weekday: 'long',
+            year: 'numeric',
+            month: 'long',
+            day: 'numeric'
+        })
+    }
+
+    // res.send(postData);
+    if (post.length === 0) {
+        return res.status(404).render('404');
+    }
+
+    res.render('post-detail', { post: postData })
+
 })
 
 router.get('/new-post', async (req, res) => {
@@ -53,15 +73,15 @@ router.get('/edit-post/:id', async (req, res) => {
 });
 
 router.post('/update-post/:id', async (req, res) => {
-    const query = `UPDATE posts SET title = '${req.body.title}', summary = '${req.body.summary}', body = '${req.body.content}' WHERE id = ${req.body.postId}`;
+    const query = `UPDATE posts SET title = '${req.body.title}', summary = '${req.body.summary}', body = '${req.body.content}', date = now() WHERE id = ${req.body.postId}`;
 
     await db.query(query);
     res.redirect('/posts');
 });
 
 router.post('/delete-post/:id', async (req, res) => {
-    const id = req.params.id;
-    await db.query(`DELETE FROM posts WHERE id=${id}`)
+    const query = `DELETE FROM posts WHERE id= ?`;
+    await db.query(query, [req.params.id]);
     res.redirect('/posts');
 })
 
