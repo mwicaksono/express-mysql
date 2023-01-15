@@ -1,4 +1,3 @@
-const e = require('express');
 const express = require('express');
 
 const router = express.Router();
@@ -36,7 +35,6 @@ router.get('/posts/:id', async (req, res) => {
         })
     }
 
-    // res.send(postData);
     if (post.length === 0) {
         return res.status(404).render('404');
     }
@@ -62,26 +60,35 @@ router.post('/posts', async (req, res) => {
 });
 
 router.get('/edit-post/:id', async (req, res) => {
-    const id = req.params.id;
     const query = `
     SELECT posts.id as postId, title, summary, body, name, date, author_id as authorId
     FROM posts JOIN authors ON authors.id = posts.author_id 
-    WHERE posts.id = ${id}
+    WHERE posts.id = ?
     `;
-    const [post] = await db.query(query);
+
+    const [post] = await db.query(query, [req.params.id]);
+    if (post.length === 0 || !post) {
+        return res.status(404).render('404');
+    }
     res.render('update-post', { post: post[0] })
 });
 
 router.post('/update-post/:id', async (req, res) => {
-    const query = `UPDATE posts SET title = '${req.body.title}', summary = '${req.body.summary}', body = '${req.body.content}', date = now() WHERE id = ${req.body.postId}`;
-
-    await db.query(query);
-    res.redirect('/posts');
+    const query = `
+    UPDATE posts 
+    SET title = ?, summary = ?, body = ?, date = now() WHERE id = ?
+    `;
+    await db.query(query, [
+        req.body.title,
+        req.body.summary,
+        req.body.content,
+        req.body.postId
+    ]);
+    res.redirect(`/posts/${req.body.postId}`);
 });
 
 router.post('/delete-post/:id', async (req, res) => {
-    const query = `DELETE FROM posts WHERE id= ?`;
-    await db.query(query, [req.params.id]);
+    await db.query(`DELETE FROM posts WHERE id= ?`, [req.params.id]);
     res.redirect('/posts');
 })
 
